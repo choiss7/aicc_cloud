@@ -1,0 +1,13 @@
+# 모니터링 서비스 의존성
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+redis==5.0.1
+boto3==1.34.0
+prometheus-client==0.19.0
+psutil==5.9.6
+structlog==23.2.0
+aiofiles==23.2.0
+asyncio-mqtt==0.16.1 
