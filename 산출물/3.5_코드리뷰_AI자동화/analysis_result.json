@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-06-14T07:22:10.062509",
+  "summary": {
+    "total_files": 4,
+    "total_lines": 3132,
+    "total_functions": 44,
+    "total_classes": 52
+  },
+  "files": [
+    {
+      "file_path": "..\\3.4_공통_통합_기능_개발\\소스코드\\auth\\auth_service.py",
+      "lines": 829,
+      "functions": 15,
+      "classes": 13,
+      "imports": 21
+    },
+    {
+      "file_path": "..\\3.4_공통_통합_기능_개발\\소스코드\\integration\\integration_service.py",
+      "lines": 876,
+      "functions": 10,
+      "classes": 15,
+      "imports": 16
+    },
+    {
+      "file_path": "..\\3.4_공통_통합_기능_개발\\소스코드\\monitoring\\monitoring_service.py",
+      "lines": 608,
+      "functions": 10,
+      "classes": 12,
+      "imports": 16
+    },
+    {
+      "file_path": "..\\3.4_공통_통합_기능_개발\\소스코드\\recording\\recording_service.py",
+      "lines": 819,
+      "functions": 9,
+      "classes": 12,
+      "imports": 20
+    }
+  ]
+}

@@ -1,0 +1,299 @@
+{
+  "timestamp": "2025-06-14T07:23:18.992760",
+  "summary": {
+    "total_files": 4,
+    "total_security_issues": 2,
+    "total_performance_issues": 1,
+    "total_style_issues": 0,
+    "average_score": 98.0
+  },
+  "files": [
+    {
+      "file_path": "..\\3.4_공통_통합_기능_개발\\소스코드\\auth\\auth_service.py",
+      "security_issues": [
+        {
+          "type": "hardcoded_secret",
+          "line": 808,
+          "message": "하드코딩된 비밀정보 발견: password=\"SecurePass...",
+          "severity": "high"
+        },
+        {
+          "type": "hardcoded_secret",
+          "line": 817,
+          "message": "하드코딩된 비밀정보 발견: password=\"SecurePass...",
+          "severity": "high"
+        }
+      ],
+      "performance_issues": [],
+      "style_issues": [],
+      "complexity": [
+        {
+          "function": "hash_password",
+          "complexity": 1,
+          "line": 212
+        },
+        {
+          "function": "verify_password",
+          "complexity": 1,
+          "line": 218
+        },
+        {
+          "function": "generate_password",
+          "complexity": 1,
+          "line": 223
+        },
+        {
+          "function": "validate_password_strength",
+          "complexity": 6,
+          "line": 230
+        },
+        {
+          "function": "generate_secret",
+          "complexity": 1,
+          "line": 273
+        },
+        {
+          "function": "generate_qr_code",
+          "complexity": 1,
+          "line": 278
+        },
+        {
+          "function": "verify_totp",
+          "complexity": 1,
+          "line": 297
+        },
+        {
+          "function": "generate_backup_codes",
+          "complexity": 1,
+          "line": 303
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 310
+        },
+        {
+          "function": "create_access_token",
+          "complexity": 1,
+          "line": 316
+        },
+        {
+          "function": "create_refresh_token",
+          "complexity": 1,
+          "line": 325
+        },
+        {
+          "function": "verify_token",
+          "complexity": 2,
+          "line": 338
+        },
+        {
+          "function": "refresh_access_token",
+          "complexity": 2,
+          "line": 348
+        },
+        {
+          "function": "__init__",
+          "complexity": 2,
+          "line": 371
+        },
+        {
+          "function": "_setup_default_roles",
+          "complexity": 5,
+          "line": 390
+        }
+      ],
+      "lines": 829,
+      "size_kb": 29.2021484375,
+      "quality_score": 94,
+      "grade": "A"
+    },
+    {
+      "file_path": "..\\3.4_공통_통합_기능_개발\\소스코드\\integration\\integration_service.py",
+      "security_issues": [],
+      "performance_issues": [],
+      "style_issues": [],
+      "complexity": [
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 132
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 198
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 222
+        },
+        {
+          "function": "register_webhook",
+          "complexity": 1,
+          "line": 225
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 250
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 308
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 371
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 470
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 537
+        },
+        {
+          "function": "_register_default_webhooks",
+          "complexity": 3,
+          "line": 562
+        }
+      ],
+      "lines": 876,
+      "size_kb": 34.9091796875,
+      "quality_score": 100,
+      "grade": "A"
+    },
+    {
+      "file_path": "..\\3.4_공통_통합_기능_개발\\소스코드\\monitoring\\monitoring_service.py",
+      "security_issues": [],
+      "performance_issues": [
+        {
+          "type": "nested_loops",
+          "message": "중첩 반복문 1개 발견",
+          "severity": "medium"
+        }
+      ],
+      "style_issues": [],
+      "complexity": [
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 62
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 85
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 118
+        },
+        {
+          "function": "_get_instance_id",
+          "complexity": 2,
+          "line": 122
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 194
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 248
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 290
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 357
+        },
+        {
+          "function": "_load_alert_rules",
+          "complexity": 1,
+          "line": 363
+        },
+        {
+          "function": "__init__",
+          "complexity": 4,
+          "line": 494
+        }
+      ],
+      "lines": 608,
+      "size_kb": 22.4951171875,
+      "quality_score": 98,
+      "grade": "A"
+    },
+    {
+      "file_path": "..\\3.4_공통_통합_기능_개발\\소스코드\\recording\\recording_service.py",
+      "security_issues": [],
+      "performance_issues": [],
+      "style_issues": [],
+      "complexity": [
+        {
+          "function": "__init__",
+          "complexity": 2,
+          "line": 126
+        },
+        {
+          "function": "encrypt_data",
+          "complexity": 1,
+          "line": 134
+        },
+        {
+          "function": "decrypt_data",
+          "complexity": 1,
+          "line": 138
+        },
+        {
+          "function": "generate_key",
+          "complexity": 1,
+          "line": 142
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 149
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 219
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 285
+        },
+        {
+          "function": "__init__",
+          "complexity": 1,
+          "line": 409
+        },
+        {
+          "function": "__init__",
+          "complexity": 2,
+          "line": 546
+        }
+      ],
+      "lines": 819,
+      "size_kb": 30.4794921875,
+      "quality_score": 100,
+      "grade": "A"
+    }
+  ]
+}
