@@ -1,0 +1,343 @@
+{
+  "Version": "2019-10-30",
+  "StartAction": "welcome-message",
+  "Actions": [
+    {
+      "Identifier": "welcome-message",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": "안녕하세요. AICC 고객센터에 연결되었습니다. 잠시만 기다려 주세요."
+      },
+      "Transitions": {
+        "NextAction": "set-working-queue"
+      }
+    },
+    {
+      "Identifier": "set-working-queue",
+      "Type": "UpdateContactAttributes",
+      "Parameters": {
+        "Attributes": {
+          "CallType": "Inbound",
+          "Timestamp": "$.CurrentTimestamp",
+          "Channel": "Voice"
+        }
+      },
+      "Transitions": {
+        "NextAction": "check-business-hours"
+      }
+    },
+    {
+      "Identifier": "check-business-hours",
+      "Type": "CheckHoursOfOperation",
+      "Parameters": {
+        "HoursOfOperationId": "arn:aws:connect:ap-northeast-2:123456789012:instance/12345678-1234-1234-1234-123456789012/operating-hours/12345678-1234-1234-1234-123456789012"
+      },
+      "Transitions": {
+        "NextAction": "main-menu",
+        "Conditions": [
+          {
+            "NextAction": "after-hours-message",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["False"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "main-menu",
+      "Type": "GetUserInput",
+      "Parameters": {
+        "Text": "원하시는 서비스를 선택해 주세요. 1번: 일반 문의, 2번: 기술 지원, 3번: 계정 관련, 4번: 상담원 연결, 0번: 이전 메뉴",
+        "MaxDigits": 1,
+        "Timeout": "8",
+        "TimeoutAudio": "죄송합니다. 입력을 받지 못했습니다. 다시 선택해 주세요.",
+        "InvalidAudio": "잘못된 선택입니다. 다시 선택해 주세요."
+      },
+      "Transitions": {
+        "NextAction": "general-inquiry",
+        "Conditions": [
+          {
+            "NextAction": "general-inquiry",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["1"]
+            }
+          },
+          {
+            "NextAction": "technical-support",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["2"]
+            }
+          },
+          {
+            "NextAction": "account-service",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["3"]
+            }
+          },
+          {
+            "NextAction": "transfer-to-agent",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["4"]
+            }
+          },
+          {
+            "NextAction": "main-menu",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["0"]
+            }
+          }
+        ],
+        "ErrorAction": "main-menu",
+        "TimeoutAction": "main-menu"
+      }
+    },
+    {
+      "Identifier": "general-inquiry",
+      "Type": "UpdateContactAttributes",
+      "Parameters": {
+        "Attributes": {
+          "Department": "General",
+          "Priority": "Normal"
+        }
+      },
+      "Transitions": {
+        "NextAction": "invoke-chatbot"
+      }
+    },
+    {
+      "Identifier": "technical-support",
+      "Type": "UpdateContactAttributes",
+      "Parameters": {
+        "Attributes": {
+          "Department": "Technical",
+          "Priority": "High"
+        }
+      },
+      "Transitions": {
+        "NextAction": "invoke-chatbot"
+      }
+    },
+    {
+      "Identifier": "account-service",
+      "Type": "UpdateContactAttributes",
+      "Parameters": {
+        "Attributes": {
+          "Department": "Account",
+          "Priority": "Normal"
+        }
+      },
+      "Transitions": {
+        "NextAction": "customer-authentication"
+      }
+    },
+    {
+      "Identifier": "customer-authentication",
+      "Type": "GetUserInput",
+      "Parameters": {
+        "Text": "계정 확인을 위해 고객번호 또는 전화번호 뒤 4자리를 입력해 주세요.",
+        "MaxDigits": 4,
+        "Timeout": "10"
+      },
+      "Transitions": {
+        "NextAction": "validate-customer",
+        "ErrorAction": "authentication-failed",
+        "TimeoutAction": "authentication-failed"
+      }
+    },
+    {
+      "Identifier": "validate-customer",
+      "Type": "InvokeLambdaFunction",
+      "Parameters": {
+        "LambdaFunctionArn": "arn:aws:lambda:ap-northeast-2:123456789012:function:aicc-customer-validation",
+        "InvocationTimeLimitSeconds": "8"
+      },
+      "Transitions": {
+        "NextAction": "invoke-chatbot",
+        "Conditions": [
+          {
+            "NextAction": "authentication-failed",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["$.External.ValidationResult", "Failed"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "authentication-failed",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": "인증에 실패했습니다. 상담원에게 연결해 드리겠습니다."
+      },
+      "Transitions": {
+        "NextAction": "transfer-to-agent"
+      }
+    },
+    {
+      "Identifier": "invoke-chatbot",
+      "Type": "ConnectParticipantWithLexBot",
+      "Parameters": {
+        "BotName": "AICC-CustomerService-Bot",
+        "BotAlias": "PROD",
+        "BotRegion": "ap-northeast-2"
+      },
+      "Transitions": {
+        "NextAction": "check-bot-result",
+        "ErrorAction": "transfer-to-agent"
+      }
+    },
+    {
+      "Identifier": "check-bot-result",
+      "Type": "CheckAttribute",
+      "Parameters": {
+        "Attribute": "BotResult",
+        "ComparisonValue": "TransferToAgent"
+      },
+      "Transitions": {
+        "NextAction": "transfer-to-agent",
+        "Conditions": [
+          {
+            "NextAction": "bot-completion-message",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["Completed"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "bot-completion-message",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": "문의사항이 해결되었습니다. 추가 도움이 필요하시면 언제든지 연락해 주세요. 감사합니다."
+      },
+      "Transitions": {
+        "NextAction": "disconnect"
+      }
+    },
+    {
+      "Identifier": "transfer-to-agent",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": "상담원에게 연결해 드리겠습니다. 잠시만 기다려 주세요."
+      },
+      "Transitions": {
+        "NextAction": "set-queue"
+      }
+    },
+    {
+      "Identifier": "set-queue",
+      "Type": "SetWorkingQueue",
+      "Parameters": {
+        "Queue": "arn:aws:connect:ap-northeast-2:123456789012:instance/12345678-1234-1234-1234-123456789012/queue/12345678-1234-1234-1234-123456789012"
+      },
+      "Transitions": {
+        "NextAction": "transfer-to-queue"
+      }
+    },
+    {
+      "Identifier": "transfer-to-queue",
+      "Type": "TransferContactToQueue",
+      "Parameters": {},
+      "Transitions": {
+        "NextAction": "queue-full-message",
+        "ErrorAction": "queue-full-message"
+      }
+    },
+    {
+      "Identifier": "queue-full-message",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": "현재 모든 상담원이 통화 중입니다. 콜백 서비스를 이용하시겠습니까? 1번을 누르시면 콜백을 신청하실 수 있습니다."
+      },
+      "Transitions": {
+        "NextAction": "callback-option"
+      }
+    },
+    {
+      "Identifier": "callback-option",
+      "Type": "GetUserInput",
+      "Parameters": {
+        "Text": "콜백 서비스를 원하시면 1번을, 계속 대기하시려면 2번을 눌러주세요.",
+        "MaxDigits": 1,
+        "Timeout": "8"
+      },
+      "Transitions": {
+        "NextAction": "schedule-callback",
+        "Conditions": [
+          {
+            "NextAction": "schedule-callback",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["1"]
+            }
+          },
+          {
+            "NextAction": "continue-waiting",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": ["2"]
+            }
+          }
+        ],
+        "ErrorAction": "continue-waiting",
+        "TimeoutAction": "continue-waiting"
+      }
+    },
+    {
+      "Identifier": "schedule-callback",
+      "Type": "InvokeLambdaFunction",
+      "Parameters": {
+        "LambdaFunctionArn": "arn:aws:lambda:ap-northeast-2:123456789012:function:aicc-schedule-callback",
+        "InvocationTimeLimitSeconds": "8"
+      },
+      "Transitions": {
+        "NextAction": "callback-confirmation"
+      }
+    },
+    {
+      "Identifier": "callback-confirmation",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": "콜백이 예약되었습니다. 곧 연락드리겠습니다. 감사합니다."
+      },
+      "Transitions": {
+        "NextAction": "disconnect"
+      }
+    },
+    {
+      "Identifier": "continue-waiting",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": "계속 대기하시겠습니다. 순서대로 연결해 드리겠습니다."
+      },
+      "Transitions": {
+        "NextAction": "transfer-to-queue"
+      }
+    },
+    {
+      "Identifier": "after-hours-message",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": "현재 운영시간이 아닙니다. 운영시간은 평일 오전 9시부터 오후 6시까지입니다. 긴급한 문의사항은 이메일로 연락해 주세요."
+      },
+      "Transitions": {
+        "NextAction": "disconnect"
+      }
+    },
+    {
+      "Identifier": "disconnect",
+      "Type": "DisconnectParticipant",
+      "Parameters": {}
+    }
+  ]
+} 

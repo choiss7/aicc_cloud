@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Connect 인스턴스 및 기본 설정 생성'
+
+Parameters:
+  InstanceAlias:
+    Type: String
+    Default: 'aicc-prod'
+    Description: 'Connect 인스턴스 별칭'
+    
+  InboundCallsEnabled:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: '인바운드 통화 활성화 여부'
+    
+  OutboundCallsEnabled:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: '아웃바운드 통화 활성화 여부'
+    
+  ContactflowLogsEnabled:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: 'Contact Flow 로그 활성화 여부'
+
+Resources:
+  # Connect 인스턴스
+  ConnectInstance:
+    Type: AWS::Connect::Instance
+    Properties:
+      InstanceAlias: !Ref InstanceAlias
+      IdentityManagementType: 'CONNECT_MANAGED'
+      InboundCallsEnabled: !Ref InboundCallsEnabled
+      OutboundCallsEnabled: !Ref OutboundCallsEnabled
+      Attributes:
+        InboundCalls: !Ref InboundCallsEnabled
+        OutboundCalls: !Ref OutboundCallsEnabled
+        ContactflowLogs: !Ref ContactflowLogsEnabled
+        ContactLens: true
+        AutoResolveBestVoices: true
+        UseCustomTTSVoices: false
+        EarlyMedia: true
+
+  # 기본 보안 프로필
+  AdminSecurityProfile:
+    Type: AWS::Connect::SecurityProfile
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      SecurityProfileName: 'AICC-Admin'
+      Description: 'AICC 관리자 보안 프로필'
+      Permissions:
+        - 'BasicAgentAccess'
+        - 'OutboundCallAccess'
+        - 'ManagerAccess'
+
+  AgentSecurityProfile:
+    Type: AWS::Connect::SecurityProfile
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      SecurityProfileName: 'AICC-Agent'
+      Description: 'AICC 상담원 보안 프로필'
+      Permissions:
+        - 'BasicAgentAccess'
+
+  # 기본 라우팅 프로필
+  DefaultRoutingProfile:
+    Type: AWS::Connect::RoutingProfile
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      Name: 'AICC-Default-Routing'
+      Description: 'AICC 기본 라우팅 프로필'
+      DefaultOutboundQueueArn: !GetAtt DefaultQueue.QueueArn
+      MediaConcurrencies:
+        - Channel: 'VOICE'
+          Concurrency: 1
+          CrossChannelBehavior:
+            BehaviorType: 'ROUTE_CURRENT_CHANNEL_ONLY'
+        - Channel: 'CHAT'
+          Concurrency: 3
+          CrossChannelBehavior:
+            BehaviorType: 'ROUTE_ANY_CHANNEL'
+
+  # 기본 큐
+  DefaultQueue:
+    Type: AWS::Connect::Queue
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      Name: 'AICC-Default-Queue'
+      Description: 'AICC 기본 대기열'
+      HoursOfOperationArn: !GetAtt DefaultHoursOfOperation.HoursOfOperationArn
+      MaxContacts: 50
+      OutboundCallerConfig:
+        OutboundCallerIdName: 'AICC Support'
+
+  # 운영 시간
+  DefaultHoursOfOperation:
+    Type: AWS::Connect::HoursOfOperation
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      Name: 'AICC-24x7'
+      Description: '24시간 운영'
+      TimeZone: 'Asia/Seoul'
+      Config:
+        - Day: 'MONDAY'
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: 'TUESDAY'
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: 'WEDNESDAY'
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: 'THURSDAY'
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: 'FRIDAY'
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: 'SATURDAY'
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+        - Day: 'SUNDAY'
+          StartTime:
+            Hours: 0
+            Minutes: 0
+          EndTime:
+            Hours: 23
+            Minutes: 59
+
+  # CloudWatch 로그 그룹
+  ConnectLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/connect/${InstanceAlias}'
+      RetentionInDays: 30
+
+  # IAM 역할 (Lambda 연동용)
+  ConnectLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${InstanceAlias}-connect-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ConnectAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - connect:GetContactAttributes
+                  - connect:UpdateContactAttributes
+                  - connect:StartOutboundVoiceContact
+                Resource: !Sub '${ConnectInstance}/*'
+
+Outputs:
+  ConnectInstanceId:
+    Description: 'Connect 인스턴스 ID'
+    Value: !Ref ConnectInstance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+
+  ConnectInstanceArn:
+    Description: 'Connect 인스턴스 ARN'
+    Value: !GetAtt ConnectInstance.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceArn'
+
+  DefaultQueueArn:
+    Description: '기본 큐 ARN'
+    Value: !GetAtt DefaultQueue.QueueArn
+    Export:
+      Name: !Sub '${AWS::StackName}-DefaultQueueArn'
+
+  DefaultRoutingProfileArn:
+    Description: '기본 라우팅 프로필 ARN'
+    Value: !GetAtt DefaultRoutingProfile.RoutingProfileArn
+    Export:
+      Name: !Sub '${AWS::StackName}-DefaultRoutingProfileArn'
+
+  AdminSecurityProfileArn:
+    Description: '관리자 보안 프로필 ARN'
+    Value: !GetAtt AdminSecurityProfile.SecurityProfileArn
+    Export:
+      Name: !Sub '${AWS::StackName}-AdminSecurityProfileArn'
+
+  AgentSecurityProfileArn:
+    Description: '상담원 보안 프로필 ARN'
+    Value: !GetAtt AgentSecurityProfile.SecurityProfileArn
+    Export:
+      Name: !Sub '${AWS::StackName}-AgentSecurityProfileArn' 
