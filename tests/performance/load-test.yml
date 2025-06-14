@@ -1,0 +1,130 @@
+config:
+  target: 'https://api.aicc-dev.example.com'
+  phases:
+    # 워밍업 단계
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    
+    # 점진적 부하 증가
+    - duration: 120
+      arrivalRate: 5
+      rampTo: 50
+      name: "Ramp up load"
+    
+    # 최대 부하 유지
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+    
+    # 스파이크 테스트
+    - duration: 60
+      arrivalRate: 100
+      name: "Spike test"
+
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+      Authorization: 'Bearer {{ $env.API_TOKEN }}'
+
+  variables:
+    customer_ids:
+      - "customer_001"
+      - "customer_002"
+      - "customer_003"
+      - "customer_004"
+      - "customer_005"
+
+scenarios:
+  # 대화 생성 및 메시지 전송 시나리오
+  - name: "Conversation Flow"
+    weight: 60
+    flow:
+      # 대화 시작
+      - post:
+          url: "/api/v1/conversation/start"
+          json:
+            customer_id: "{{ customer_ids[$randomInt(0, 4)] }}"
+            channel: "web"
+            initial_message: "안녕하세요, 도움이 필요합니다"
+          capture:
+            - json: "$.conversation_id"
+              as: "conversation_id"
+          expect:
+            - statusCode: 200
+            - hasProperty: "conversation_id"
+
+      # 메시지 전송
+      - post:
+          url: "/api/v1/conversation/{{ conversation_id }}/message"
+          json:
+            message: "제품에 대해 문의하고 싶습니다"
+            sender: "customer"
+          expect:
+            - statusCode: 200
+
+      # 대화 상태 확인
+      - get:
+          url: "/api/v1/conversation/{{ conversation_id }}/status"
+          expect:
+            - statusCode: 200
+
+      # 대화 종료
+      - post:
+          url: "/api/v1/conversation/{{ conversation_id }}/end"
+          json:
+            reason: "resolved"
+            satisfaction_score: 4
+          expect:
+            - statusCode: 200
+
+  # FAQ 검색 시나리오
+  - name: "FAQ Search"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/v1/faq/search"
+          qs:
+            query: "{{ $randomString() }}"
+            limit: 10
+          expect:
+            - statusCode: 200
+
+  # 관리자 API 시나리오
+  - name: "Admin Operations"
+    weight: 10
+    flow:
+      # 대화 목록 조회
+      - get:
+          url: "/api/v1/admin/conversations"
+          qs:
+            limit: 20
+            status: "active"
+          expect:
+            - statusCode: 200
+
+      # 분석 데이터 조회
+      - get:
+          url: "/api/v1/admin/analytics"
+          qs:
+            start_date: "2024-01-01"
+            end_date: "2024-12-31"
+          expect:
+            - statusCode: 200
+
+# 성능 임계값 설정
+expect:
+  # 평균 응답 시간 200ms 이하
+  - expression: "response.time.mean < 200"
+    
+  # 95% 응답 시간 500ms 이하
+  - expression: "response.time.p95 < 500"
+    
+  # 에러율 1% 이하
+  - expression: "errors.rate < 0.01"
+
+# 플러그인 설정
+plugins:
+  expect: {}
+  metrics-by-endpoint:
+    useOnlyRequestNames: true 
