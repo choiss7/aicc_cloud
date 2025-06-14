@@ -7,10 +7,14 @@ import boto3
 import json
 import logging
 from typing import Dict, List, Optional, Any, Union
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from botocore.exceptions import ClientError, BotoCoreError
 import os
 from functools import lru_cache
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -20,22 +24,22 @@ class AWSClientManager:
     
     def __init__(
         self,
-        region_name: str = "ap-northeast-2",
+        region_name: Optional[str] = None,
         profile_name: Optional[str] = None,
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None
     ):
-        self.region_name = region_name
-        self.profile_name = profile_name
+        self.region_name = region_name or os.getenv('AWS_REGION', 'ap-northeast-2')
+        self.profile_name = profile_name or os.getenv('AWS_PROFILE')
         
         # 세션 구성
-        if profile_name:
-            self.session = boto3.Session(profile_name=profile_name)
+        if self.profile_name:
+            self.session = boto3.Session(profile_name=self.profile_name)
         else:
             self.session = boto3.Session(
                 aws_access_key_id=aws_access_key_id or os.getenv('AWS_ACCESS_KEY_ID'),
                 aws_secret_access_key=aws_secret_access_key or os.getenv('AWS_SECRET_ACCESS_KEY'),
-                region_name=region_name
+                region_name=self.region_name
             )
         
         # 클라이언트 캐시
@@ -582,16 +586,16 @@ class AWSServiceFactory:
     
     def __init__(
         self,
-        region_name: str = "ap-northeast-2",
+        region_name: Optional[str] = None,
         profile_name: Optional[str] = None,
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None
     ):
         self.aws_manager = AWSClientManager(
-            region_name=region_name,
-            profile_name=profile_name,
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key
+            region_name=region_name or os.getenv('AWS_REGION', 'ap-northeast-2'),
+            profile_name=profile_name or os.getenv('AWS_PROFILE'),
+            aws_access_key_id=aws_access_key_id or os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=aws_secret_access_key or os.getenv('AWS_SECRET_ACCESS_KEY')
         )
     
     def get_connect_client(self, instance_id: str) -> ConnectClient:

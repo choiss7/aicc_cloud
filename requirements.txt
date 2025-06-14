@@ -1,0 +1,48 @@
+# AWS Connect 콜센터 프로젝트 의존성
+
+# AWS SDK
+boto3>=1.26.0
+botocore>=1.29.0
+
+# 웹 프레임워크
+fastapi>=0.95.0
+uvicorn[standard]>=0.21.0
+pydantic>=1.10.0
+
+# 환경 변수 관리
+python-dotenv>=1.0.0
+
+# 데이터베이스
+aioboto3>=11.0.0
+
+# 로깅 및 모니터링
+structlog>=23.0.0
+python-json-logger>=2.0.0
+
+# 유틸리티
+pyyaml>=6.0
+requests>=2.28.0
+python-multipart>=0.0.6
+
+# 보안
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# 테스트
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+httpx>=0.24.0
+
+# 개발 도구
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+pre-commit>=3.0.0
+
+# 한국어 처리 (필요시)
+konlpy>=0.6.0
+
+# 기타
+python-dateutil>=2.8.0
+pytz>=2023.3 

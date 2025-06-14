@@ -12,6 +12,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 from functools import lru_cache
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 
 class Environment(Enum):
@@ -25,18 +29,22 @@ class Environment(Enum):
 @dataclass
 class AWSConfig:
     """AWS 서비스 설정"""
-    region: str = "ap-northeast-2"
-    profile_name: Optional[str] = None
-    access_key_id: Optional[str] = None
-    secret_access_key: Optional[str] = None
+    region: str = os.getenv('AWS_REGION', 'ap-northeast-2')
+    profile_name: Optional[str] = os.getenv('AWS_PROFILE')
+    access_key_id: Optional[str] = os.getenv('AWS_ACCESS_KEY_ID')
+    secret_access_key: Optional[str] = os.getenv('AWS_SECRET_ACCESS_KEY')
     
     # AWS Connect 설정
-    connect_instance_id: Optional[str] = None
+    connect_instance_id: Optional[str] = os.getenv('AWS_CONNECT_INSTANCE_ID')
+    connect_contact_flow_id: Optional[str] = os.getenv('AWS_CONNECT_CONTACT_FLOW_ID')
+    connect_queue_id: Optional[str] = os.getenv('AWS_CONNECT_QUEUE_ID')
     connect_instance_arn: Optional[str] = None
     
     # DynamoDB 설정
+    dynamodb_table_name: str = os.getenv('AWS_DYNAMODB_TABLE_NAME', 'aicc-conversations')
+    dynamodb_region: str = os.getenv('AWS_DYNAMODB_REGION', 'ap-northeast-2')
     dynamodb_tables: Dict[str, str] = field(default_factory=lambda: {
-        'conversations': 'aicc-conversations',
+        'conversations': os.getenv('AWS_DYNAMODB_TABLE_NAME', 'aicc-conversations'),
         'users': 'aicc-users',
         'agents': 'aicc-agents',
         'faq': 'aicc-faq',
@@ -44,21 +52,28 @@ class AWSConfig:
     })
     
     # S3 설정
+    s3_bucket_name: str = os.getenv('AWS_S3_BUCKET_NAME', 'aicc-default-bucket')
+    s3_region: str = os.getenv('AWS_S3_REGION', 'ap-northeast-2')
     s3_buckets: Dict[str, str] = field(default_factory=lambda: {
-        'recordings': 'aicc-call-recordings',
+        'recordings': os.getenv('AWS_S3_BUCKET_NAME', 'aicc-call-recordings'),
         'reports': 'aicc-reports',
         'backups': 'aicc-backups'
     })
     
     # Lex 설정
-    lex_bot_name: str = "AICC_ChatBot"
-    lex_bot_alias: str = "PROD"
+    lex_bot_name: str = os.getenv('AWS_LEX_BOT_NAME', 'AICC_ChatBot')
+    lex_bot_alias: str = os.getenv('AWS_LEX_BOT_ALIAS', 'PROD')
+    lex_bot_version: str = os.getenv('AWS_LEX_BOT_VERSION', '$LATEST')
     lex_v2_bot_id: Optional[str] = None
     lex_v2_bot_alias_id: str = "TSTALIASID"
     lex_locale_id: str = "ko_KR"
     
+    # Lambda 설정
+    lambda_function_name: str = os.getenv('AWS_LAMBDA_FUNCTION_NAME', 'aicc-chatbot-function')
+    
     # CloudWatch 설정
-    cloudwatch_log_group: str = "/aws/lambda/aicc-chatbot"
+    cloudwatch_log_group: str = os.getenv('AWS_CLOUDWATCH_LOG_GROUP', '/aws/lambda/connect-chatbot')
+    cloudwatch_log_stream: str = os.getenv('AWS_CLOUDWATCH_LOG_STREAM', 'chatbot-logs')
     cloudwatch_metrics_namespace: str = "AICC/ChatBot"
 
 
@@ -110,9 +125,9 @@ class ChatbotConfig:
 @dataclass
 class APIConfig:
     """API 서버 설정"""
-    host: str = "0.0.0.0"
-    port: int = 8000
-    debug: bool = False
+    host: str = os.getenv('API_HOST', '0.0.0.0')
+    port: int = int(os.getenv('API_PORT', '8000'))
+    debug: bool = os.getenv('APP_DEBUG', 'false').lower() == 'true'
     
     # CORS 설정
     cors_origins: List[str] = field(default_factory=lambda: ["*"])
@@ -120,7 +135,10 @@ class APIConfig:
     cors_headers: List[str] = field(default_factory=lambda: ["*"])
     
     # 보안 설정
-    secret_key: str = "your-secret-key-change-in-production"
+    secret_key: str = os.getenv('API_SECRET_KEY', 'your-secret-key-change-in-production')
+    jwt_secret_key: str = os.getenv('JWT_SECRET_KEY', 'your-jwt-secret-key')
+    jwt_algorithm: str = os.getenv('JWT_ALGORITHM', 'HS256')
+    jwt_expiration_hours: int = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
     access_token_expire_minutes: int = 30
     
     # 요청 제한
@@ -135,14 +153,15 @@ class APIConfig:
 @dataclass
 class LoggingConfig:
     """로깅 설정"""
-    level: str = "INFO"
+    level: str = os.getenv('APP_LOG_LEVEL', 'INFO')
     format: str = "json"  # json, text
     
     # 파일 로깅
     enable_file_logging: bool = True
     log_directory: str = "logs"
-    max_file_size_mb: int = 10
-    backup_count: int = 5
+    log_file_path: str = os.getenv('LOG_FILE_PATH', 'logs/app.log')
+    max_file_size_mb: int = int(os.getenv('LOG_MAX_SIZE', '10').replace('MB', ''))
+    backup_count: int = int(os.getenv('LOG_BACKUP_COUNT', '5'))
     
     # 콘솔 로깅
     enable_console_logging: bool = True

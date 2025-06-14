@@ -3,10 +3,15 @@ AWS Connect 콜센터용 자연어 이해(NLU) 모듈
 """
 import json
 import logging
+import os
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 import boto3
 from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +34,17 @@ class NLUResponse:
 class ChatbotNLU:
     """AWS Connect 챗봇 자연어 이해 처리기"""
     
-    def __init__(self, lex_bot_name: str, lex_bot_alias: str = "DRAFT"):
-        self.lex_bot_name = lex_bot_name
-        self.lex_bot_alias = lex_bot_alias
-        self.lex_client = boto3.client('lexv2-runtime')
+    def __init__(self, lex_bot_name: Optional[str] = None, lex_bot_alias: Optional[str] = None):
+        self.lex_bot_name = lex_bot_name or os.getenv('AWS_LEX_BOT_NAME', 'AICC_ChatBot')
+        self.lex_bot_alias = lex_bot_alias or os.getenv('AWS_LEX_BOT_ALIAS', 'DRAFT')
+        
+        # AWS 클라이언트 초기화
+        session = boto3.Session(
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            region_name=os.getenv('AWS_REGION', 'ap-northeast-2')
+        )
+        self.lex_client = session.client('lexv2-runtime')
         
         # 의도별 신뢰도 임계값
         self.confidence_threshold = {
