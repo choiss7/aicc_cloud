@@ -1,0 +1,391 @@
+name: AICC Cloud CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-northeast-2
+  PYTHON_VERSION: '3.9'
+  NODE_VERSION: '18'
+
+jobs:
+  # 코드 품질 검사 및 테스트
+  test:
+    name: 코드 품질 검사 및 테스트
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Python 환경 설정
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Python 의존성 캐시
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Python 의존성 설치
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        
+    - name: 코드 스타일 검사 (flake8)
+      run: |
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: 코드 포맷팅 검사 (black)
+      run: |
+        black --check src/
+        
+    - name: 타입 힌트 검사 (mypy)
+      run: |
+        mypy src/ --ignore-missing-imports
+        
+    - name: 보안 취약점 검사 (bandit)
+      run: |
+        bandit -r src/ -f json -o bandit-report.json
+        
+    - name: 단위 테스트 실행
+      run: |
+        python -m pytest src/tests/ -v --cov=src --cov-report=xml --cov-report=html
+        
+    - name: 테스트 커버리지 업로드
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        
+    - name: 테스트 결과 아티팩트 업로드
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          htmlcov/
+          bandit-report.json
+          coverage.xml
+
+  # Lambda 함수 패키징 및 검증
+  lambda-package:
+    name: Lambda 함수 패키징
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Python 환경 설정
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Lambda 패키지 생성
+      run: |
+        mkdir -p lambda-packages
+        
+        # 각 Lambda 함수별 패키지 생성
+        for lambda_dir in connect/lambda/*/; do
+          if [ -d "$lambda_dir" ]; then
+            lambda_name=$(basename "$lambda_dir")
+            echo "패키징: $lambda_name"
+            
+            # 의존성 설치
+            pip install -r "$lambda_dir/requirements.txt" -t "$lambda_dir/package/"
+            
+            # 소스 코드 복사
+            cp -r src/ "$lambda_dir/package/"
+            cp "$lambda_dir"/*.py "$lambda_dir/package/"
+            
+            # ZIP 패키지 생성
+            cd "$lambda_dir/package"
+            zip -r "../../../lambda-packages/$lambda_name.zip" .
+            cd ../../../
+          fi
+        done
+        
+    - name: Lambda 패키지 아티팩트 업로드
+      uses: actions/upload-artifact@v3
+      with:
+        name: lambda-packages
+        path: lambda-packages/
+
+  # Infrastructure as Code 검증
+  infrastructure-validate:
+    name: 인프라 코드 검증
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Terraform 설정
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+        
+    - name: Terraform 포맷 검사
+      run: |
+        cd infrastructure/
+        terraform fmt -check -recursive
+        
+    - name: Terraform 초기화
+      run: |
+        cd infrastructure/
+        terraform init -backend=false
+        
+    - name: Terraform 검증
+      run: |
+        cd infrastructure/
+        terraform validate
+        
+    - name: Terraform 계획 (Dry Run)
+      run: |
+        cd infrastructure/
+        terraform plan -out=tfplan
+        
+    - name: Terraform 계획 아티팩트 업로드
+      uses: actions/upload-artifact@v3
+      with:
+        name: terraform-plan
+        path: infrastructure/tfplan
+
+  # API 문서 생성 및 검증
+  api-docs:
+    name: API 문서 생성
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Python 환경 설정
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: 의존성 설치
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Swagger 문서 생성
+      run: |
+        cd src/api/
+        python -c "
+        from chatbot_api_swagger import create_app
+        import json
+        
+        app = create_app()
+        with app.app_context():
+            spec = app.api.__schema__
+            with open('../../docs/api-spec.json', 'w', encoding='utf-8') as f:
+                json.dump(spec, f, ensure_ascii=False, indent=2)
+        "
+        
+    - name: API 문서 아티팩트 업로드
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-documentation
+        path: docs/
+
+  # 개발 환경 배포
+  deploy-dev:
+    name: 개발 환경 배포
+    runs-on: ubuntu-latest
+    needs: [test, lambda-package, infrastructure-validate]
+    if: github.ref == 'refs/heads/develop'
+    environment: development
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: AWS 자격 증명 설정
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Lambda 패키지 다운로드
+      uses: actions/download-artifact@v3
+      with:
+        name: lambda-packages
+        path: lambda-packages/
+        
+    - name: Terraform 설정
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+        
+    - name: 개발 환경 배포
+      run: |
+        cd infrastructure/
+        terraform init
+        terraform workspace select dev || terraform workspace new dev
+        terraform apply -auto-approve -var="environment=dev"
+        
+    - name: Lambda 함수 배포
+      run: |
+        for package in lambda-packages/*.zip; do
+          function_name=$(basename "$package" .zip)
+          aws lambda update-function-code \
+            --function-name "aicc-dev-$function_name" \
+            --zip-file "fileb://$package"
+        done
+        
+    - name: Connect Contact Flow 업데이트
+      run: |
+        # Contact Flow 설정 업데이트
+        aws connect put-contact-flow \
+          --instance-id ${{ secrets.CONNECT_INSTANCE_ID_DEV }} \
+          --contact-flow-id ${{ secrets.CONTACT_FLOW_ID_DEV }} \
+          --content file://connect/contact-flows/main-flow.json
+
+  # 프로덕션 환경 배포
+  deploy-prod:
+    name: 프로덕션 환경 배포
+    runs-on: ubuntu-latest
+    needs: [test, lambda-package, infrastructure-validate]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: AWS 자격 증명 설정
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Lambda 패키지 다운로드
+      uses: actions/download-artifact@v3
+      with:
+        name: lambda-packages
+        path: lambda-packages/
+        
+    - name: Terraform 설정
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+        
+    - name: 프로덕션 환경 배포
+      run: |
+        cd infrastructure/
+        terraform init
+        terraform workspace select prod || terraform workspace new prod
+        terraform apply -auto-approve -var="environment=prod"
+        
+    - name: Lambda 함수 배포 (Blue-Green)
+      run: |
+        for package in lambda-packages/*.zip; do
+          function_name=$(basename "$package" .zip)
+          
+          # 새 버전 생성
+          version=$(aws lambda publish-version \
+            --function-name "aicc-prod-$function_name" \
+            --zip-file "fileb://$package" \
+            --query 'Version' --output text)
+          
+          # 별칭 업데이트 (Blue-Green 배포)
+          aws lambda update-alias \
+            --function-name "aicc-prod-$function_name" \
+            --name "live" \
+            --function-version "$version"
+        done
+        
+    - name: 배포 후 검증
+      run: |
+        # 헬스 체크
+        curl -f "${{ secrets.API_ENDPOINT_PROD }}/health" || exit 1
+        
+        # Connect 인스턴스 상태 확인
+        aws connect describe-instance \
+          --instance-id ${{ secrets.CONNECT_INSTANCE_ID_PROD }}
+
+  # 보안 스캔
+  security-scan:
+    name: 보안 스캔
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: 의존성 취약점 스캔
+      run: |
+        pip install safety
+        safety check -r requirements.txt
+        
+    - name: 시크릿 스캔
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+
+  # 성능 테스트
+  performance-test:
+    name: 성능 테스트
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Node.js 환경 설정
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Artillery 설치
+      run: npm install -g artillery
+      
+    - name: 성능 테스트 실행
+      run: |
+        artillery run tests/performance/load-test.yml
+        
+    - name: 성능 테스트 결과 업로드
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: artillery-report.html
+
+  # 알림
+  notify:
+    name: 배포 알림
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, deploy-prod]
+    if: always()
+    
+    steps:
+    - name: Slack 알림
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#aicc-deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }} 
