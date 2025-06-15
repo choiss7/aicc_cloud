@@ -318,3 +318,16 @@ aicc_cloud/
 
 **AI**: requirements-fixed.txt 파일의 한글 인코딩 문제를 해결하기 위해 영어로 된 requirements-en.txt 파일을 생성하고 의존성을 성공적으로 설치했습니다. 이제 AWS Connect 콜센터 개발을 진행할 수 있습니다.
 
+**사용자**: 프로젝트 구조를 살펴보고 문서화해주세요.
+
+**AI**: AWS Connect 콜센터 프로젝트의 구조를 살펴보고 다음과 같은 문서화 작업을 완료했습니다:
+
+1. connect/lambda/README.md - Lambda 함수 설명 및 배포 방법 문서화
+2. connect/contact-flows/README.md - Contact Flow 설명 및 배포 방법 문서화
+
+주요 컴포넌트:
+- Lambda 함수: chatbot_handler.py - 고객 문의 처리 및 응답 생성
+- Contact Flow: inbound-flow.json - 인바운드 통화 처리 흐름 정의
+
+모든 변경사항을 Git에 커밋하고 원격 저장소에 푸시했습니다.
+
